@@ -7,7 +7,7 @@
 #include <stdexcept>
 #include <utility>
 
-// Blocking bounded MPMC queue.
+// Blocking bounded multi-producer, multi-consumer queue.
 // push waits while full and returns false after close().
 // pop waits while empty, drains items that were already queued, then returns false.
 // Waits use predicates so a spurious wakeup cannot observe a broken state.
@@ -46,28 +46,6 @@ public:
         return true;
     }
 
-    // Does not wait for capacity. Still takes the mutex, unlike the lock-free queue.
-    bool try_push(const T& value) {
-        std::lock_guard<std::mutex> lock(mu_);
-        if (closed_ || queue_.size() >= capacity_) {
-            return false;
-        }
-        queue_.push_back(value);
-        not_empty_.notify_one();
-        return true;
-    }
-
-    bool try_pop(T& result) {
-        std::lock_guard<std::mutex> lock(mu_);
-        if (queue_.empty()) {
-            return false;
-        }
-        result = std::move(queue_.front());
-        queue_.pop_front();
-        not_full_.notify_one();
-        return true;
-    }
-
     void close() {
         std::lock_guard<std::mutex> lock(mu_);
         closed_ = true;
@@ -75,14 +53,9 @@ public:
         not_full_.notify_all();
     }
 
-    size_t size() const {
-        std::lock_guard<std::mutex> lock(mu_);
-        return queue_.size();
-    }
-
 private:
     const size_t capacity_;
-    mutable std::mutex mu_;
+    std::mutex mu_;
     std::condition_variable not_empty_;
     std::condition_variable not_full_;
     std::deque<T> queue_;

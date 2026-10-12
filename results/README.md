@@ -1,17 +1,5 @@
-# What to keep
+# Results
 
-From this repository root:
+`throughput.csv` is written by `./build/throughput` when it runs from the repository root. Each row is one configuration: producers, consumers, capacity, item count, median time over 5 runs, and items per second.
 
-```bash
-cmake -S . -B build && cmake --build build -j
-./build/throughput
-```
-
-That overwrites `throughput.csv`. Commit that file when the numbers are the ones you want to show. The README summary should match the CSV. If you rerun on another machine, commit the new CSV and update the README from it.
-
-Also worth keeping, as text you paste into the README rather than a binary:
-
-- the `PASS queue_stress` line
-- a ThreadSanitizer log, only from a run that gets past startup
-
-`build/` is gitignored. Do not commit the executables.
+If you rerun on another machine, commit the new CSV and update the table in the main README from it. `build/` is gitignored, so do not commit the executables.
