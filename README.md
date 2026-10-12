@@ -70,31 +70,31 @@ cmake --build build -j
 
 ThreadSanitizer is the `queue_stress_tsan` binary (`-O1 -g -fsanitize=thread`). A clean run is evidence about that execution, not a proof that no race exists.
 
-## Measured on this WSL run
+## Measured results
 
-`results/throughput.csv` is from one run on this machine, with the binaries on the Windows filesystem mount. Absolute rates will move. The shape of the table is the result worth explaining.
+Figures below are taken from `results/throughput.csv`. Every parallel row passed the checksum `0 + ... + (n-1)`. Absolute rates depend on the machine. The comparison is the result.
 
-Uncontended push+pop pair, 200,000 iterations, one thread:
+Uncontended push then pop, one thread, 200,000 pairs:
 
-- mutex: 275 ns
-- lock-free, padded indices: 93 ns
-- lock-free, shared cache line: 96 ns
+- mutex: 49 ns/pair
+- lock-free, padded head and tail: 18 ns/pair
+- lock-free, both counters on one cache line: 24 ns/pair
 
-`try_spin` throughput, 100,000 items, capacity 1024. "1 thread" means one producer and one consumer:
+`try_spin`, 100,000 items, capacity 1024. The thread count is producers plus the same number of consumers:
 
-- 1+1: mutex 0.68M items/s, padded lock-free 2.30M, unpadded lock-free 1.83M
-- 8+8: mutex 0.47M items/s, padded lock-free 0.78M, unpadded lock-free 0.53M
+- 1+1: mutex 2.29M items/s, padded lock-free 19.4M, unpadded lock-free 7.83M
+- 8+8: mutex 1.05M items/s, padded lock-free 2.25M, unpadded lock-free 1.39M
 
-Padding does nothing measurable in the single-thread pair, and it shows up as soon as a producer and a consumer hit the two counters together. At 8+8 the padded ring is about 1.5x the unpadded ring.
+Padding isolates false sharing on the head and tail. With one thread and no second core hitting the other counter, the gap is small. With a producer and a consumer, and again at 8+8, the padded ring is about 1.6x the unpadded ring (2.25M versus 1.39M items/s).
 
-Blocking mutex throughput, same 100,000 items:
+Blocking mutex queue, same 100,000 items:
 
-- capacity 1024, 1+1: 0.76M items/s; 8+8: 0.34M items/s
-- capacity 64, 1+1: 0.24M items/s; 8+8: 0.08M items/s
+- capacity 1024: 2.85M items/s at 1+1, 0.90M at 8+8
+- capacity 64: 1.41M items/s at 1+1, 0.17M at 8+8
 
-The small capacity is backpressure, not a faster queue. Checksums matched on every row. These numbers are not a ranking of lock-free versus mutex in general: `try_spin` burns CPU when the queue is full, and `blocking` is the design that can sleep.
+The smaller capacity is backpressure. `try_spin` burns CPU when the queue is full, so those rows are not a ranking against the blocking queue. The lock-free queue is lock-free, not wait-free, and it has no `close()`.
 
-ThreadSanitizer did not run. On this WSL kernel `queue_stress_tsan` aborts at startup with `FATAL: ThreadSanitizer: unexpected memory mapping` before any test executes. Copying the binary onto the Linux filesystem did not change that. The functional `queue_stress` binary passed. A sanitizer result has to come from a run that actually starts.
+ThreadSanitizer did not start on the WSL kernel used here. `queue_stress_tsan` aborts with `FATAL: ThreadSanitizer: unexpected memory mapping` before any test runs. The functional `queue_stress` binary passed. A sanitizer result has to come from a run that gets past startup.
 
 ## Benchmark
 
